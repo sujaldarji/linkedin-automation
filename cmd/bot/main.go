@@ -1,13 +1,13 @@
 package main
 
 import (
+	"linkedin-automation/internal/browser"
 	"log"
 	"time"
-	"linkedin-automation/internal/browser"
 )
 
 func main() {
-	log.Println("Starting LinkedIn Automation Bot (Stage 1)")
+	log.Println("Starting LinkedIn Automation Bot (Stage 2)")
 
 	b := browser.New()
 	defer b.Close()
@@ -17,5 +17,5 @@ func main() {
 	log.Println("Page title:", page.MustInfo().Title)
 
 	// Keep browser open for observation
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 }

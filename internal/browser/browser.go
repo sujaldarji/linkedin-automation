@@ -29,7 +29,7 @@ func New() *Browser {
 
 	u := launcher.New().
 		Bin(`C:\Program Files\Google\Chrome\Application\chrome.exe`).
-		UserDataDir(profileDir). // 🔑 PERSISTENT SESSION
+		UserDataDir(profileDir). // PERSISTENT SESSION
 		Headless(false).
 		Set("disable-blink-features", "AutomationControlled").         // REQUIRED for CAPTCHA/manual login
 		MustLaunch()

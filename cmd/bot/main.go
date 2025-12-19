@@ -2,13 +2,14 @@ package main
 
 import (
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
 	"linkedin-automation/internal/auth"
 	"linkedin-automation/internal/browser"
+	"linkedin-automation/internal/mousemovement"
 	"linkedin-automation/internal/search"
+	"linkedin-automation/internal/state"
 	"linkedin-automation/internal/stealth"
 
 	"github.com/joho/godotenv"
@@ -17,16 +18,23 @@ import (
 func main() {
 	log.Println("Starting LinkedIn Automation Bot (Stage 4)")
 
-	_ = godotenv.Load() // env is optional
+	_ = godotenv.Load()
+
+	// Initialize state store
+	store, err := state.NewStore("state.db")
+	if err != nil {
+		log.Fatalf("failed to initialize state store: %v", err)
+	}
+	defer store.Close()
 
 	b := browser.New()
 	defer b.Close()
 
-	// Open LinkedIn home
+	// Open LinkedIn
 	page := b.NewPage("https://www.linkedin.com")
 	time.Sleep(2 * time.Second)
 
-	// Check login status
+	// Login check
 	if strings.Contains(page.MustInfo().URL, "/feed") {
 		log.Println("✅ Already logged in via persistent browser profile")
 	} else {
@@ -35,76 +43,74 @@ func main() {
 		if !auth.Login(page) {
 			log.Fatal("Login failed")
 		}
-
-		log.Println("Login successful (session persisted by Chrome)")
+		log.Println("Login successful (session persisted)")
 	}
 
-	// Stage 4 – Phase 4 demo (pagination + human behavior)
-	runSearchDemo(b)
+	// Stage 4 execution
+	runSearchDemo(b, store)
 
-	// Keep browser open briefly for observation/demo
-	time.Sleep(30 * time.Second)
+	time.Sleep(20 * time.Second)
 }
 
-func runSearchDemo(b *browser.Browser) {
-	log.Println("\n=== Stage 4 | Phase 4: Pagination + Human Behavior Demo ===")
+func runSearchDemo(b *browser.Browser, store *state.Store) {
+	log.Println("\n=== Stage 4 | Search, Pagination & State Persistence Demo ===")
 
-	baseURL := "https://www.linkedin.com/search/results/people/?keywords=software%20engineer"
-	maxPages := 3
+	input := &search.Input{
+		Keywords:  "software engineer",
+		PageLimit: 3,
+	}
 
-	allProfiles := make(map[string]search.Profile)
+	if err := input.Validate(); err != nil {
+		log.Fatalf("invalid search input: %v", err)
+	}
 
-	for pageNum := 1; pageNum <= maxPages; pageNum++ {
+	for pageNum := 1; pageNum <= input.PageLimit; pageNum++ {
 		log.Printf("\n[Phase 4] Navigating to page %d", pageNum)
 
-		searchURL := baseURL
-		if pageNum > 1 {
-			searchURL += "&page=" + strconv.Itoa(pageNum)
-		}
-
-		// Open search page
+		searchURL := search.BuildPeopleSearchURL(input, pageNum)
 		page := b.NewPage(searchURL)
 
-		// Human-like pause after navigation (think time)
-		log.Println("[Behavior] Page loaded, waiting briefly before interaction")
-		stealth.RandomDelay(2000, 4000)
+		// Create mouse controller for this page
+		mouse := mousemovement.New(page)
 
-		// Light human scroll to trigger lazy loading
-		log.Println("[Behavior] Performing light human-like scroll")
+		// Human-like delay
+		log.Println("[Behavior] Page loaded, waiting briefly")
+		stealth.RandomDelay(1200, 2000)
+
+		// Optional: hover over results container
+		if container, err := page.Element("div.search-results-container"); err == nil {
+			log.Println("[Behavior] Hovering over results area")
+			_ = mouse.Hover(container)
+			stealth.RandomDelay(400, 700)
+		}
+
+		log.Println("[Behavior] Performing light scroll")
 		search.LightScroll(page)
+		
+		// Mouse wait simulation
+		mouse.Wait()
 
-		// Human reading pause before parsing
-		log.Println("[Behavior] Pausing before reading results")
-		stealth.RandomDelay(1000, 1500)
+		log.Println("[Behavior] Pausing before parsing")
+		stealth.RandomDelay(800, 1500)
 
-		// Parse visible results (read-only)
+		// Parse profiles
 		profiles := search.ParseVisibleResults(page)
 
-		// Aggregate with global deduplication
 		for _, p := range profiles {
-			if _, exists := allProfiles[p.URL]; exists {
+			if err := store.EnsureProfile(p.URL); err != nil {
+				log.Printf("[State] Failed to persist %s: %v", p.URL, err)
 				continue
 			}
-			allProfiles[p.URL] = p
+			log.Printf("[State] Profile persisted: %s", p.URL)
 		}
 
 		log.Printf(
-			"[Phase 4] Page %d complete — total unique profiles collected so far: %d",
+			"[Phase 4] Page %d complete — profiles processed: %d",
 			pageNum,
-			len(allProfiles),
+			len(profiles),
 		)
 	}
 
-	// Final summary
-	log.Println("\n=== FINAL RESULTS ===")
-	log.Printf("Total unique profiles collected: %d\n", len(allProfiles))
-
-	i := 1
-	for _, p := range allProfiles {
-		log.Printf("%d. %s", i, p.URL)
-		if p.Name != "" {
-			log.Printf("   Name: %s", p.Name)
-		}
-		i++
-	}
+	log.Println("\n=== Stage 4 Complete ===")
+	log.Println("All discovered profiles are now persisted in SQLite state store")
 }

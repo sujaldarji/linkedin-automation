@@ -1,22 +1,18 @@
 package search
 
-import "fmt"
+import "errors"
 
-// Input represents search criteria for LinkedIn people search
 type Input struct {
-	Keywords string
+	Keywords  string
 	PageLimit int
 }
 
-// Validate ensures search input is usable
-func (in *Input) Validate() error {
-	if in.Keywords == "" {
-		return fmt.Errorf("search keywords cannot be empty")
+func (i *Input) Validate() error {
+	if i.Keywords == "" {
+		return errors.New("keywords cannot be empty")
 	}
-
-	if in.PageLimit <= 0 {
-		in.PageLimit = 1 // sensible default
+	if i.PageLimit <= 0 {
+		return errors.New("page limit must be greater than zero")
 	}
-
 	return nil
 }

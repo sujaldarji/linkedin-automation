@@ -6,8 +6,7 @@ import "time"
 type ProfileState struct {
 	ProfileURL     string
 	Visited        bool
-	ConnectionSent bool
-	Status         string
 	CreatedAt      time.Time
+	LastVisitedAt  *time.Time
 	LastActionAt   *time.Time
 }

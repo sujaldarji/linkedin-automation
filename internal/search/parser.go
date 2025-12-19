@@ -8,67 +8,107 @@ import (
 )
 
 type Profile struct {
-	URL string
+	URL  string
+	Name string // optional
 }
 
-// ParseProfiles extracts visible profile URLs from LinkedIn search results
-func ParseProfiles(page *rod.Page) ([]Profile, error) {
+// ParseVisibleResults - Stage 4 (Phase 3)
+// Read-only parsing of visible LinkedIn search results
+func ParseVisibleResults(page *rod.Page) []Profile {
+	log.Println("[Phase 3] Parsing visible search results...")
+
 	var profiles []Profile
+	seen := make(map[string]bool)
 
-	// Debug: confirm page is loaded
-	html, _ := page.HTML()
-	log.Printf("[DEBUG] Page HTML length: %d", len(html))
+	// Collect anchors that look like profile links
+	links, err := page.Elements(`a[href*="/in/"]`)
+	if err != nil {
+		log.Println("[Parser] No profile links found")
+		return profiles
+	}
 
-	// Enumerate frames
-	frames := page.Frames()
-	log.Printf("[DEBUG] Number of frames: %d", len(frames))
+	log.Printf("[Parser] Found %d raw profile links", len(links))
 
-	for i, f := range frames {
-		frameHTML, _ := f.HTML()
-		log.Printf("[DEBUG] Frame %d HTML length: %d", i, len(frameHTML))
-
-		anchors, err := f.Elements(`a[href*="/in/"]`)
-		if err != nil {
+	for _, link := range links {
+		href, err := link.Attribute("href")
+		if err != nil || href == nil {
 			continue
 		}
 
-		log.Printf("[DEBUG] Frame %d profile links: %d", i, len(anchors))
-
-		for _, a := range anchors {
-			href, err := a.Attribute("href")
-			if err != nil || href == nil {
-				continue
-			}
-
-			url := normalizeProfileURL(*href)
-			if url == "" {
-				continue
-			}
-
-			profiles = append(profiles, Profile{
-				URL: url,
-			})
+		url := cleanProfileURL(*href)
+		if url == "" {
+			continue
 		}
+
+		// Deduplication (per page)
+		if seen[url] {
+			log.Printf("[Duplicate] Skipping: %s", url)
+			continue
+		}
+		seen[url] = true
+
+		// Best-effort name extraction (very conservative)
+		name := extractName(link)
+
+		profiles = append(profiles, Profile{
+			URL:  url,
+			Name: name,
+		})
+
+		log.Printf("[Parsed] %s", url)
 	}
 
-	return profiles, nil
+	log.Printf("[Phase 3 Complete] Found %d unique profiles", len(profiles))
+	return profiles
 }
 
-// normalizeProfileURL ensures clean LinkedIn profile URLs
-func normalizeProfileURL(raw string) string {
+// cleanProfileURL keeps only real-looking LinkedIn profile URLs
+func cleanProfileURL(raw string) string {
 	if !strings.Contains(raw, "/in/") {
 		return ""
 	}
 
-	// Strip query params
-	if idx := strings.Index(raw, "?"); idx != -1 {
-		raw = raw[:idx]
-	}
-
-	// Ensure absolute URL
+	// Make absolute
 	if strings.HasPrefix(raw, "/") {
 		raw = "https://www.linkedin.com" + raw
 	}
 
+	// Remove tracking params
+	if idx := strings.Index(raw, "?"); idx != -1 {
+		raw = raw[:idx]
+	}
+
+	// Reject obviously non-human or system-generated profiles
+	// (service cards, internal URNs, etc.)
+	if strings.Contains(raw, "ACoAA") {
+		return ""
+	}
+
+	if !strings.HasPrefix(raw, "https://www.linkedin.com/in/") {
+		return ""
+	}
+
 	return raw
+}
+
+// extractName tries to read visible link text if it looks human
+func extractName(link *rod.Element) string {
+	text, err := link.Text()
+	if err != nil {
+		return ""
+	}
+
+	text = strings.TrimSpace(text)
+
+	// Very conservative: reject long promotional strings
+	if text == "" || len(text) > 50 {
+		return ""
+	}
+
+	// Remove common UI noise
+	if strings.Contains(strings.ToLower(text), "provides services") {
+		return ""
+	}
+
+	return text
 }

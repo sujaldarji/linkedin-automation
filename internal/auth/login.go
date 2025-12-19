@@ -49,7 +49,7 @@ func Login(page *rod.Page) bool {
 	page.MustElement(`button[type="submit"]`).MustClick()
 
 	// 4. Graceful post-login check loop
-	const maxChecks = 12
+	const maxChecks = 20
 	for i := 1; i <= maxChecks; i++ {
 		time.Sleep(5 * time.Second)
 

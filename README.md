@@ -7,7 +7,7 @@ This repository contains a **Go-based proof of concept (PoC)** for LinkedIn brow
 
 A short walkthrough
 
-**Video link:**
+**Video link:** https://youtu.be/kgsKSQly7JA
 
 ---
 

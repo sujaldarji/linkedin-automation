@@ -24,6 +24,27 @@ This PoC focuses on:
 - Read-only profile visits with human-like behavior
 ---
 
+## 🕵️ Stealth Architecture (Summary)
+
+This project includes a **lightweight, modular stealth layer** designed to normalize the browser environment before any LinkedIn interaction occurs.
+
+**Key characteristics:**
+- One **stable human-like identity per session** (User-Agent + viewport)
+- **Minimal, high-impact techniques** instead of aggressive fingerprint spoofing
+- All stealth logic is **centralized and extensible**
+- JavaScript overrides are applied **before page scripts execute**
+
+**Implemented measures:**
+- Masks automation flags (`navigator.webdriver`)
+- Uses a realistic Chrome-on-Windows User-Agent
+- Applies realistic viewport sizing with session-level consistency
+- Ensures pages are fully loaded before interaction
+
+**Design goal:**  
+Remove common automation fingerprints while keeping the system reliable, explainable, and easy to extend.
+
+---
+
 ## ⚙️ How It Works
 
 ### 1. Browser & Login
